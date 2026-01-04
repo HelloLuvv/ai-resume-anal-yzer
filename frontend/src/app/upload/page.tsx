@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase.ts'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
 
