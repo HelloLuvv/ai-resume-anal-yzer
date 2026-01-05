@@ -42,41 +42,41 @@ const Navbar = () => {
             <h1 className="text-lg sm:text-xl font-bold text-white group-hover:text-blue-400 transition-colors duration-300 truncate hidden xs:block">Resume Analyzer</h1>
           </div>
 
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            <a
-              href="/upload"
-              className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
-                pathname === '/upload'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              Upload
-            </a>
-            <a
-              href="/results"
-              className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
-                pathname === '/results'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              Results
-            </a>
-            <a
-              href="/dashboard"
-              className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
-                pathname === '/dashboard'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              Dashboard
-            </a>
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-1 sm:flex-none justify-end sm:justify-start">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <a
+                href="/upload"
+                className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
+                  pathname === '/upload'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Upload
+              </a>
+              <a
+                href="/results"
+                className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
+                  pathname === '/results'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Results
+              </a>
+              <a
+                href="/dashboard"
+                className={`px-2 sm:px-4 py-2 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium hover:scale-105 active:scale-95 ${
+                  pathname === '/dashboard'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Dashboard
+              </a>
+            </div>
 
-            <div className="h-6 w-px bg-white/20 mx-1"></div>
-
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center ml-2 sm:ml-4">
               <button
                 onClick={handleSignOut}
                 className="px-2 sm:px-4 py-2 bg-red-600/10 hover:bg-red-600/20 text-red-300 hover:text-red-200 rounded-lg transition-all duration-300 text-xs sm:text-base font-medium border border-red-500/20 hover:border-red-500/40 hover:scale-105 active:scale-95"
