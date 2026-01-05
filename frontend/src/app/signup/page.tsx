@@ -7,13 +7,24 @@ const Signup = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
   const handleSignup = async () => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) {
-      alert(error.message)
-    } else {
-      alert('Check your email for confirmation')
-      window.location.href = '/login'
+    setError('')
+    setSuccess('')
+    try {
+      const { error: authError } = await supabase.auth.signUp({ email, password })
+      if (authError) {
+        setError(authError.message)
+      } else {
+        setSuccess('Check your email for confirmation')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 3000)
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     }
   }
 
@@ -42,6 +53,16 @@ const Signup = () => {
               className="w-full p-3 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
           </div>
+          {error && (
+            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm text-center">
+              {error === 'Failed to fetch' ? 'Unable to connect to authentication server. Please check your internet connection and verify SUPABASE_URL.' : error}
+            </div>
+          )}
+          {success && (
+            <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-xl text-green-200 text-sm text-center">
+              {success}
+            </div>
+          )}
           <button
             onClick={handleSignup}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 mt-2"

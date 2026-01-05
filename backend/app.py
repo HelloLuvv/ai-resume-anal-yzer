@@ -18,7 +18,7 @@ import base64
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 def get_auth_supabase(token):
     return create_client(
@@ -61,7 +61,7 @@ def extract_text(file_path):
         with pdfplumber.open(file_path) as pdf:
             text = ''
             for page in pdf.pages:
-                text += page.extract_text() or '' + '\n'
+                text += (page.extract_text() or '') + '\n'
         return text
     elif file_path.lower().endswith('.docx'):
         doc = Document(file_path)
@@ -167,34 +167,48 @@ def upload_resume():
         # Create authenticated Supabase client with user's token for RLS
         auth_supabase = get_auth_supabase(token)
         
-        # Save to temp
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            file.save(temp_file.name)
-            temp_path = temp_file.name
+        # Save to temp - Use a safer approach for Windows
+        suffix = os.path.splitext(file.filename)[1]
+        fd, temp_path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        file.save(temp_path)
         
         # Extract text
         text = extract_text(temp_path)
         cleaned_text = clean_text(text)
         
         # Upload to Supabase Storage with authenticated client
-        bucket = auth_supabase.storage.from_('resumes')
-        file_name = f"{user_id}_{file.filename}"
-        with open(temp_path, 'rb') as f:
-            bucket.upload(file_name, f, {"upsert": "true"})
+        try:
+            bucket = auth_supabase.storage.from_('resumes')
+            file_name = f"{user_id}_{file.filename}"
+            with open(temp_path, 'rb') as f:
+                upload_res = bucket.upload(file_name, f, {"upsert": True})
+            
+            # Check if upload was successful (different versions of supabase-py return different things)
+            # In latest it might raise an exception or return an object with error
+        except Exception as storage_err:
+            print(f'Storage error: {str(storage_err)}')
+            return jsonify({'error': f'Failed to upload to storage: {str(storage_err)}. Ensure "resumes" bucket exists.'}), 500
+
         url = bucket.get_public_url(file_name)
         
         # Store in DB using authenticated client (for RLS) - user_id will be enforced by RLS
-        # Use upsert to handle re-uploads of the same file
-        auth_supabase.table('resumes').upsert({
-            'user_id': user_id,
-            'file_name': file_name,
-            'url': url,
-            'text': cleaned_text
-        }, on_conflict='file_name').execute()
+        try:
+            auth_supabase.table('resumes').upsert({
+                'user_id': user_id,
+                'file_name': file_name,
+                'url': url,
+                'text': cleaned_text
+            }, on_conflict='file_name').execute()
+        except Exception as db_err:
+            print(f'Database error: {str(db_err)}')
+            return jsonify({'error': f'Failed to save resume metadata: {str(db_err)}'}), 500
         
         os.remove(temp_path)
         return jsonify({'resume_id': file_name, 'url': url})
     except Exception as e:
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
         print(f'Error in upload_resume: {str(e)}')
         return jsonify({'error': f'Failed to upload resume: {str(e)}'}), 500
 

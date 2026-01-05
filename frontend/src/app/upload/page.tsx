@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { supabase } from '@/lib/supabase'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 
 const Upload = () => {
@@ -18,6 +18,17 @@ const Upload = () => {
     if (!file) return
 
     setError('')
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+    if (!backendUrl || backendUrl === 'undefined') {
+      setError('Backend URL is not configured. Please set NEXT_PUBLIC_BACKEND_URL.')
+      return
+    }
+
+    if (window.location.protocol === 'https:' && backendUrl.startsWith('http:')) {
+      setError('Blocked mixed content: Cannot connect to an insecure HTTP backend from an HTTPS site. Please use HTTPS for the backend.')
+      return
+    }
+
     setFileName(file.name)
     setUploading(true)
     setProgress(10)
@@ -78,10 +89,28 @@ const Upload = () => {
       setTimeout(() => {
         router.push('/results')
       }, 500)
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to process resume. Please try again.'
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to process resume. Please try again.'
+      
+      if (isAxiosError(error)) {
+        if (error.response) {
+          // The request was made and the server responded with a status code
+          errorMessage = error.response.data?.error || `Server error: ${error.response.status}`
+        } else {
+          // The request was made but no response was received OR something happened in setting up the request
+          errorMessage = error.message
+          if (error.message === 'Network Error' || error.message?.includes('fetch') || error.code === 'ERR_NETWORK') {
+            errorMessage = 'Failed to fetch from backend. This usually happens due to CORS issues, an incorrect backend URL, or the server being down.'
+          } else if (error.request) {
+            errorMessage = 'No response from backend. Please check if the backend is running and NEXT_PUBLIC_BACKEND_URL is correct.'
+          }
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
       setError(errorMessage)
-      console.error(error)
+      console.error('Upload error:', error)
       setUploading(false)
     }
   }
