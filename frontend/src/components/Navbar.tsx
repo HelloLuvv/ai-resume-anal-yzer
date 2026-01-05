@@ -35,7 +35,7 @@ const Navbar = () => {
     <nav className="bg-white/10 backdrop-blur-xl border-b border-white/20 shadow-xl sticky top-0 z-50 animate-fade-in">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-2 group cursor-pointer" onClick={() => router.push('/dashboard')}>
+          <div className="flex items-center space-x-2 group cursor-pointer hide-logo-mobile" onClick={() => router.push('/dashboard')}>
             <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
               <span className="text-white font-bold">R</span>
             </div>

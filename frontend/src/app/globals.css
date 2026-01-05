@@ -10,7 +10,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --breakpoint-xs: 400px;
+  --breakpoint-xs: 452px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +27,11 @@ body {
 }
 
 @layer utilities {
+  .hide-logo-mobile {
+    @media (max-width: 452px) or (max-height: 666px) {
+      display: none !important;
+    }
+  }
   .animate-fade-in {
     animation: fadeIn 0.5s ease-out forwards;
   }
