@@ -182,7 +182,7 @@ def upload_resume():
             bucket = auth_supabase.storage.from_('resumes')
             file_name = f"{user_id}_{file.filename}"
             with open(temp_path, 'rb') as f:
-                upload_res = bucket.upload(file_name, f, {"upsert": True})
+                upload_res = bucket.upload(file_name, f, {"upsert": "true"})
             
             # Check if upload was successful (different versions of supabase-py return different things)
             # In latest it might raise an exception or return an object with error
