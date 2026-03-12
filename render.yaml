@@ -1,0 +1,32 @@
+# Render deployment configuration for the AI Resume Analyzer backend
+# This file tells Render how to build and run the service when you connect
+the repository to Render.
+
+services:
+  - type: web
+    name: ai-resume-backend
+    # Use Dockerfile defined in backend/ directory so Render builds the same image
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    # optional: specify a region if you prefer, e.g. "oregon"
+    # region: oregon
+    # Automatically deploy the `main` branch by default
+    branch: main
+    # expose port 5000 (already exposed in Dockerfile)
+    # the build and start commands are handled by the Dockerfile
+    
+    # Define any environment variables your app needs. In Render these should be
+    # set up as encrypted "Environment" variables or "Secrets" via the Render
+    # dashboard. The keys below are only an example and should correspond to
+    # what you use in your .env file locally.
+    envVars:
+      - key: SUPABASE_URL
+        fromSecret: SUPABASE_URL
+      - key: SUPABASE_ANON_KEY
+        fromSecret: SUPABASE_ANON_KEY
+      - key: PORT
+        value: "5000"
+      # add other variables as required (e.g. JWT_SECRET, etc.)
+
+  # If you eventually deploy the frontend as well you can add another service
+  # here. For now the focus is on the backend API.
