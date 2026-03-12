@@ -373,10 +373,10 @@ def analyze_resume():
                                            formatting_issues=formatting_issues,
                                            section_structure_missing=missing_sections)
         
-        # Store analysis using authenticated client
+        # Store analysis using authenticated client; do NOT include contacts so we
+        # never depend on a database column. The API response still returns them.
         auth_supabase.table('analyses').upsert({
             'resume_id': resume_id,
-            'contacts': contacts,
             'skills': skills,
             'education': education,
             'experience': experience,
@@ -414,8 +414,9 @@ def ats_score():
         if not resume_id:
             return jsonify({'error': 'Missing resume_id'}), 400
         
-        # Get analysis using authenticated client
-        res = auth_supabase.table('analyses').select('*').eq('resume_id', resume_id).execute()
+        # Get analysis using authenticated client (exclude contacts column to avoid
+        # errors if the database has no such field)
+        res = auth_supabase.table('analyses').select('skills,education,experience,formatting_issues,sections_missing,suggestions,ats_score,ats_breakdown').eq('resume_id', resume_id).execute()
         if not res.data:
             return jsonify({'error': 'Analysis not found'}), 404
         data = res.data[0]
