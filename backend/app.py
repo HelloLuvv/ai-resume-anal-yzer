@@ -373,17 +373,7 @@ def analyze_resume():
                                            formatting_issues=formatting_issues,
                                            section_structure_missing=missing_sections)
         
-        # Store analysis using authenticated client; do NOT include contacts so we
-        # never depend on a database column. The API response still returns them.
-        auth_supabase.table('analyses').upsert({
-            'resume_id': resume_id,
-            'skills': skills,
-            'education': education,
-            'experience': experience,
-            'formatting_issues': formatting_issues,
-            'sections_missing': missing_sections,
-            'suggestions': suggestions
-        }, on_conflict='resume_id').execute()
+
         
         return jsonify({
             'contacts': contacts,
@@ -414,35 +404,29 @@ def ats_score():
         if not resume_id:
             return jsonify({'error': 'Missing resume_id'}), 400
         
-        # Get analysis using authenticated client (exclude contacts column to avoid
-        # errors if the database has no such field)
-        res = auth_supabase.table('analyses').select('skills,education,experience,formatting_issues,sections_missing,suggestions,ats_score,ats_breakdown').eq('resume_id', resume_id).execute()
-        if not res.data:
-            return jsonify({'error': 'Analysis not found'}), 404
-        data = res.data[0]
-        
-        # Get text using authenticated client
+        # Get text from resume
         text_res = auth_supabase.table('resumes').select('text').eq('file_name', resume_id).execute()
+        if not text_res.data:
+            return jsonify({'error': 'Resume not found'}), 404
         text = text_res.data[0]['text']
 
-        # prepare job keywords if provided
+        # Compute analysis fresh from text (avoid database schema issues)
+        skills = extract_skills(text, SKILLS)
+        education = extract_education(text)
+        experience = extract_experience(text)
+        formatting_issues = check_formatting(text)
+        _, missing_sections = check_section_structure(text)
+
+        # Prepare job keywords if provided
         job_keywords = None
         if job_desc:
             job_keywords = extract_job_keywords(job_desc)
-        formatting_issues = data.get('formatting_issues')
-        section_score = None
-        if data.get('sections_missing') is not None:
-            _, missing = check_section_structure(text)
-            section_score = 10 - len(missing) * 2
 
-        breakdown = calculate_ats_breakdown(data['skills'], data['education'], data['experience'], text,
+        breakdown = calculate_ats_breakdown(skills, education, experience, text,
                                            formatting_issues=formatting_issues,
-                                           section_structure_score=section_score,
                                            job_keywords=job_keywords,
                                            simulator=simulator)
         score = breakdown['total']
-        # Update using authenticated client
-        auth_supabase.table('analyses').update({'ats_score': score, 'ats_breakdown': breakdown}).eq('resume_id', resume_id).execute()
         
         return jsonify({'score': score, 'breakdown': breakdown})
     except Exception as e:
@@ -462,10 +446,12 @@ def job_recommendations():
         if not resume_id:
             return jsonify({'error': 'Missing resume_id'}), 400
         
-        res = auth_supabase.table('analyses').select('skills').eq('resume_id', resume_id).execute()
+        # Get resume text and compute skills
+        res = auth_supabase.table('resumes').select('text').eq('file_name', resume_id).execute()
         if not res.data:
-            return jsonify({'error': 'Analysis not found'}), 404
-        skills = res.data[0]['skills']
+            return jsonify({'error': 'Resume not found'}), 404
+        text = res.data[0]['text']
+        skills = extract_skills(text, SKILLS)
         
         jobs = recommend_jobs(skills)
         return jsonify({'jobs': jobs})

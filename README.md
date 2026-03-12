@@ -59,34 +59,11 @@ CREATE TABLE resumes (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Analyses table
-CREATE TABLE analyses (
-  id SERIAL PRIMARY KEY,
-  resume_id TEXT REFERENCES resumes(file_name),
-  skills TEXT[],
-  education TEXT[],
-  experience JSONB,
-  formatting_issues TEXT[],
-  sections_missing TEXT[],
-  suggestions TEXT[],
-  ats_score INTEGER,
-  ats_breakdown JSONB,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- The backend no longer writes a `contacts` column; contact info is returned
--- in responses but not persisted. If you previously added `contacts` during
--- development you can drop that column:
+-- NOTE: The backend no longer uses an `analyses` table. Analysis results are 
+-- computed on-the-fly from resume text and returned in API responses.
+-- If you created an `analyses` table during development, it is safe to drop it:
 --
--- ALTER TABLE analyses
---   DROP COLUMN IF EXISTS contacts;
-
--- If you already created the table without `contacts`, run the
--- following migration in the SQL editor or via psql to add it:
---
--- ALTER TABLE analyses
---   ADD COLUMN IF NOT EXISTS contacts JSONB;
---
+-- DROP TABLE IF EXISTS analyses;
 
 -- Storage bucket
 -- Create a bucket named 'resumes' with public access
