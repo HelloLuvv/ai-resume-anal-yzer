@@ -104,25 +104,151 @@ def extract_experience(text):
             roles.append(ent.text)
     return {'dates': list(set(dates)), 'roles': list(set(roles))}
 
-def calculate_ats_score(skills, education, experience, text):
-    score = 0
-    # Skills presence
-    score += min(len(skills) * 5, 40)
-    # Education
-    if education:
-        score += 20
-    # Experience
-    if experience['roles']:
-        score += 20
-    # Length
-    word_count = len(text.split())
-    if word_count > 200:
-        score += 10
-    # Formatting (assume good)
-    score += 10
-    return min(score, 100)
 
-def generate_suggestions(skills, education, experience):
+def extract_contact_info(text):
+    """Pull out name, email, phone number from resume text."""
+    name = None
+    email = None
+    phone = None
+
+    # simple regex for email and phone
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+', text)
+    if email_match:
+        email = email_match.group(0)
+    phone_match = re.search(r'(\+?\d[\d\s\-\(\)]{7,}\d)', text)
+    if phone_match:
+        phone = phone_match.group(0)
+
+    # spaCy NER for person name
+    doc = nlp(text)
+    for ent in doc.ents:
+        if ent.label_ == 'PERSON':
+            name = ent.text
+            break
+
+    return {'name': name, 'email': email, 'phone': phone}
+
+
+def check_formatting(text):
+    """Look for formatting patterns that ATS generally disfavor."""
+    issues = []
+    # tables or vertical bars
+    if re.search(r'\|', text) or re.search(r'\t', text):
+        issues.append('Tables or tabular formatting detected')
+    # image references (often extracted as [Figure], etc.)
+    if re.search(r'\[Figure', text, re.I) or re.search(r'Figure \d', text):
+        issues.append('Image references detected')
+    # two-column heuristic (very rough): many short lines alternating
+    lines = [l for l in text.splitlines() if l.strip()]
+    if len(lines) > 20:
+        short = sum(1 for l in lines if len(l.split()) < 3)
+        if short / len(lines) > 0.3:
+            issues.append('Possible multi-column layout detected')
+    return issues
+
+
+def check_section_structure(text):
+    """Score presence of common resume sections and return missing ones."""
+    sections = ['education', 'experience', 'skills', 'projects', 'certifications', 'summary', 'objective']
+    found = []
+    for sec in sections:
+        if re.search(r'\b' + re.escape(sec) + r'\b', text, re.I):
+            found.append(sec)
+    score = min(10, len(found) * 2)  # 2 points per section up to 10
+    missing = [sec for sec in sections if sec not in found]
+    return score, missing
+
+
+def calculate_ats_breakdown(skills, education, experience, text, formatting_issues=None, section_structure_score=None, job_keywords=None, simulator='generic'):
+    breakdown = {}
+    # weighting differs slightly by simulator
+    weights = {
+        'keyword': 40,
+        'skills': 25,
+        'format': 15,
+        'experience': 10,
+        'sections': 10,
+        'education': 10
+    }
+    if simulator == 'workday':
+        weights['keyword'] = 35
+        weights['skills'] = 30
+    elif simulator == 'greenhouse':
+        weights['format'] = 20
+        weights['sections'] = 5
+    elif simulator == 'lever':
+        weights['experience'] = 15
+        weights['education'] = 5
+    # keyword match
+    keyword_score = 0
+    if job_keywords:
+        # compute ratio of job_keywords found in text
+        found = sum(1 for kw in job_keywords if kw.lower() in text.lower())
+        keyword_score = (found / max(len(job_keywords), 1)) * weights['keyword']
+    else:
+        # fallback: use skills count as proxy
+        keyword_score = min(len(skills) * 5, weights['keyword'])
+    breakdown['keyword_match'] = round(keyword_score, 1)
+
+    # skills match
+    skills_score = min(len(skills) * 5, weights['skills'])
+    breakdown['skills'] = round(skills_score, 1)
+
+    # formatting
+    if formatting_issues is None:
+        formatting_issues = check_formatting(text)
+    format_score = max(weights['format'] - len(formatting_issues) * 5, 0)
+    breakdown['formatting'] = round(format_score, 1)
+    breakdown['formatting_issues'] = formatting_issues
+
+    # experience
+    exp_score = weights['experience'] if experience.get('roles') else 0
+    breakdown['experience'] = round(exp_score, 1)
+
+    # sections
+    if section_structure_score is None:
+        section_structure_score, missing = check_section_structure(text)
+    breakdown['sections'] = round(section_structure_score, 1)
+    breakdown['missing_sections'] = missing
+
+    # education
+    edu_score = weights['education'] if education else 0
+    breakdown['education'] = round(edu_score, 1)
+
+    # total
+    breakdown['total'] = round(sum(breakdown[k] for k in ['keyword_match','skills','formatting','experience','sections','education']), 1)
+    return breakdown
+
+
+def extract_job_keywords(text):
+    """Return set of known skills (from SKILLS list) found in the job description."""
+    found = []
+    lower = text.lower()
+    for skill in SKILLS:
+        if skill.lower() in lower:
+            found.append(skill)
+    # include other words using basic tokenization (could be enhanced later)
+    return list(set(found))
+
+
+def skills_from_text(text):
+    """Small helper that uses the same extractor as resume analysis."""
+    return extract_skills(text, SKILLS)
+
+def calculate_ats_score(skills, education, experience, text, formatting_issues=None, section_structure_score=None, job_keywords=None, simulator='generic'):
+    """Return a simple overall ATS score (0-100) using the provided breakdown pieces.
+    This wrapper will call :pyfunc:`calculate_ats_breakdown` and sum the components.
+    ``simulator`` can be one of ``generic``/``workday``/``greenhouse``/``lever``
+    to slightly tweak weights and mimic different vendor behaviours.
+    """
+    breakdown = calculate_ats_breakdown(skills, education, experience, text,
+                                        formatting_issues=formatting_issues,
+                                        section_structure_score=section_structure_score,
+                                        job_keywords=job_keywords,
+                                        simulator=simulator)
+    return min(breakdown.get('total', 0), 100)
+
+def generate_suggestions(skills, education, experience, formatting_issues=None, section_structure_missing=None):
     suggestions = []
     if len(skills) < 3:
         suggestions.append("Add more technical skills relevant to your field")
@@ -132,6 +258,11 @@ def generate_suggestions(skills, education, experience):
         suggestions.append("Add detailed work experience")
     if len(experience['dates']) < 2:
         suggestions.append("Include dates for your experiences")
+    if formatting_issues:
+        for issue in formatting_issues:
+            suggestions.append(f"Fix formatting issue: {issue}")
+    if section_structure_missing:
+        suggestions.append("Consider adding or renaming sections: " + ", ".join(section_structure_missing))
     return suggestions
 
 def recommend_jobs(skills):
@@ -232,24 +363,35 @@ def analyze_resume():
             return jsonify({'error': 'Resume not found'}), 404
         text = res.data[0]['text']
         
+        contacts = extract_contact_info(text)
         skills = extract_skills(text, SKILLS)
         education = extract_education(text)
         experience = extract_experience(text)
-        suggestions = generate_suggestions(skills, education, experience)
+        formatting_issues = check_formatting(text)
+        section_score, missing_sections = check_section_structure(text)
+        suggestions = generate_suggestions(skills, education, experience,
+                                           formatting_issues=formatting_issues,
+                                           section_structure_missing=missing_sections)
         
         # Store analysis using authenticated client
         auth_supabase.table('analyses').upsert({
             'resume_id': resume_id,
+            'contacts': contacts,
             'skills': skills,
             'education': education,
             'experience': experience,
+            'formatting_issues': formatting_issues,
+            'sections_missing': missing_sections,
             'suggestions': suggestions
         }, on_conflict='resume_id').execute()
         
         return jsonify({
+            'contacts': contacts,
             'skills': skills,
             'education': education,
             'experience': experience,
+            'formatting_issues': formatting_issues,
+            'sections_missing': missing_sections,
             'suggestions': suggestions
         })
     except Exception as e:
@@ -266,6 +408,9 @@ def ats_score():
         auth_supabase = get_auth_supabase(token)
         
         resume_id = request.json.get('resume_id')
+        simulator = request.json.get('simulator', 'generic')
+        job_desc = request.json.get('job_description')
+
         if not resume_id:
             return jsonify({'error': 'Missing resume_id'}), 400
         
@@ -278,13 +423,27 @@ def ats_score():
         # Get text using authenticated client
         text_res = auth_supabase.table('resumes').select('text').eq('file_name', resume_id).execute()
         text = text_res.data[0]['text']
-        
-        score = calculate_ats_score(data['skills'], data['education'], data['experience'], text)
-        
+
+        # prepare job keywords if provided
+        job_keywords = None
+        if job_desc:
+            job_keywords = extract_job_keywords(job_desc)
+        formatting_issues = data.get('formatting_issues')
+        section_score = None
+        if data.get('sections_missing') is not None:
+            _, missing = check_section_structure(text)
+            section_score = 10 - len(missing) * 2
+
+        breakdown = calculate_ats_breakdown(data['skills'], data['education'], data['experience'], text,
+                                           formatting_issues=formatting_issues,
+                                           section_structure_score=section_score,
+                                           job_keywords=job_keywords,
+                                           simulator=simulator)
+        score = breakdown['total']
         # Update using authenticated client
-        auth_supabase.table('analyses').update({'ats_score': score}).eq('resume_id', resume_id).execute()
+        auth_supabase.table('analyses').update({'ats_score': score, 'ats_breakdown': breakdown}).eq('resume_id', resume_id).execute()
         
-        return jsonify({'score': score})
+        return jsonify({'score': score, 'breakdown': breakdown})
     except Exception as e:
         return jsonify({'error': f'Failed to calculate ATS score: {str(e)}'}), 500
 
@@ -315,6 +474,49 @@ def job_recommendations():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy'})
+
+
+@app.route('/api/job-match', methods=['POST'])
+def job_match():
+    """Compare resume against a provided job description."""
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing authorization token'}), 401
+        token = auth_header.replace('Bearer ', '')
+        auth_supabase = get_auth_supabase(token)
+
+        resume_id = request.json.get('resume_id')
+        job_desc = request.json.get('job_description', '')
+        if not resume_id or not job_desc:
+            return jsonify({'error': 'Missing resume_id or job_description'}), 400
+
+        # fetch resume text
+        res = auth_supabase.table('resumes').select('text').eq('file_name', resume_id).execute()
+        if not res.data:
+            return jsonify({'error': 'Resume not found'}), 404
+        text = res.data[0]['text']
+
+        # compute simple cosine similarity on bag-of-words
+        vec = CountVectorizer().fit_transform([text, job_desc])
+        score = float(cosine_similarity(vec[0:1], vec[1:])[0][0])
+        match_percent = round(score * 100, 1)
+
+        job_keywords = extract_job_keywords(job_desc)
+        found_keywords = [kw for kw in job_keywords if kw.lower() in text.lower()]
+        missing_keywords = [kw for kw in job_keywords if kw not in found_keywords]
+
+        skill_gap = [kw for kw in job_keywords if kw not in skills_from_text(text)]
+
+        return jsonify({
+            'match_score': match_percent,
+            'required_keywords': job_keywords,
+            'found_keywords': found_keywords,
+            'missing_keywords': missing_keywords,
+            'skill_gap': skill_gap
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to perform job match: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

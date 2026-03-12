@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 
 interface AnalysisData {
+  contacts?: { name?: string; email?: string; phone?: string }
   atsScore: number
+  atsBreakdown?: any
   skills: string[]
   education: string[]
   experience: {
@@ -12,6 +14,15 @@ interface AnalysisData {
   }
   suggestions: string[]
   jobs: string[]
+  formatting_issues?: string[]
+  sections_missing?: string[]
+  jobMatch?: {
+    match_score: number
+    required_keywords: string[]
+    found_keywords: string[]
+    missing_keywords: string[]
+    skill_gap: string[]
+  }
 }
 
 const Results = () => {
@@ -27,15 +38,30 @@ const Results = () => {
 
   if (!data) return <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">Loading...</div>
 
+  const breakdown = data.atsBreakdown || {}
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-x-hidden">
       <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 animate-fade-in">
         <header className="mb-10">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3">Analysis Results</h1>
           <p className="text-slate-400 text-base sm:text-lg">Your resume analysis is complete. Here&apos;s what we found:</p>
+          <p className="text-xs text-slate-500 mt-2">
+            <a href="/ats-info" className="underline hover:text-white">How ATS score works</a>
+          </p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {data.contacts && (
+            <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl animate-slide-up">
+              <h2 className="text-2xl font-bold text-white mb-4">Contact Info</h2>
+              <div className="space-y-1 text-slate-200 text-sm">
+                {data.contacts.name && <p><strong>Name:</strong> {data.contacts.name}</p>}
+                {data.contacts.email && <p><strong>Email:</strong> {data.contacts.email}</p>}
+                {data.contacts.phone && <p><strong>Phone:</strong> {data.contacts.phone}</p>}
+              </div>
+            </div>
+          )}
           <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl md:col-span-1 lg:col-span-1 animate-slide-up">
             <h2 className="text-2xl font-bold text-white mb-6">ATS Score</h2>
             <div className="flex flex-col items-center justify-center">
@@ -67,6 +93,29 @@ const Results = () => {
               <p className="text-slate-300 text-center">out of 100</p>
             </div>
           </div>
+          {breakdown && (
+            <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl md:col-span-1 lg:col-span-2 animate-slide-up [animation-delay:50ms]">
+              <h2 className="text-xl font-bold text-white mb-4">Score Breakdown</h2>
+              <ul className="text-slate-200 text-sm space-y-1">
+                <li>Keyword match: {breakdown.keyword_match ?? 0}</li>
+                <li>Skills: {breakdown.skills ?? 0}</li>
+                <li>Formatting: {breakdown.formatting ?? 0}</li>
+                <li>Experience: {breakdown.experience ?? 0}</li>
+                <li>Sections: {breakdown.sections ?? 0}</li>
+                <li>Education: {breakdown.education ?? 0}</li>
+              </ul>
+              {breakdown.formatting_issues && breakdown.formatting_issues.length > 0 && (
+                <div className="mt-2 text-yellow-300 text-xs">
+                  ⚠ {breakdown.formatting_issues.join(', ')}
+                </div>
+              )}
+              {breakdown.missing_sections && breakdown.missing_sections.length > 0 && (
+                <div className="mt-2 text-yellow-300 text-xs">
+                  Missing sections: {breakdown.missing_sections.join(', ')}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl md:col-span-1 animate-slide-up [animation-delay:100ms]">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center">
@@ -125,6 +174,40 @@ const Results = () => {
             </div>
           </div>
 
+          {data.jobMatch && (
+            <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl md:col-span-1 lg:col-span-2 animate-slide-up [animation-delay:350ms]">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+                <span className="inline-block w-1 h-6 bg-red-500 rounded mr-2"></span>
+                Job Description Match
+              </h2>
+              <p className="text-slate-200">Match score: {data.jobMatch.match_score}%</p>
+              {data.jobMatch?.required_keywords.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-slate-300 text-sm mb-1">Keywords:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {data.jobMatch.required_keywords.map((kw,i) => {
+                      const present = data.jobMatch?.found_keywords.includes(kw)
+                      return (
+                        <span
+                          key={i}
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            present ? 'bg-green-600' : 'bg-red-600'
+                          }`}
+                        >
+                          {kw}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {data.jobMatch.skill_gap.length > 0 && (
+                <p className="text-yellow-300 text-sm mt-2">
+                  Skill gap: {data.jobMatch.skill_gap.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
           <div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-xl md:col-span-1 lg:col-span-2 animate-slide-up [animation-delay:400ms]">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center">
               <span className="inline-block w-1 h-6 bg-yellow-500 rounded mr-2"></span>
@@ -158,6 +241,9 @@ const Results = () => {
           <a href="/upload" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105">
             Analyze Another Resume
           </a>
+        </div>
+        <div className="mt-6 text-center text-xs text-slate-500">
+          <p>ATS insights based on industry practices from SHRM, LinkedIn, and Indeed.</p>
         </div>
       </main>
     </div>

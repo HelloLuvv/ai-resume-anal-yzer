@@ -6,7 +6,10 @@ A production-ready AI-based resume analyzer web application.
 
 - Upload PDF/DOCX resumes
 - AI-powered skill extraction, education, and experience analysis
-- ATS compatibility scoring
+- ATS compatibility scoring with detailed breakdown and simulator modes
+- Job description matching with keyword gap analysis
+- Resume parsing (contact info, skills, education, experience)
+- Formatting and section structure checks
 - Resume improvement suggestions
 - Job role recommendations
 
@@ -60,11 +63,15 @@ CREATE TABLE resumes (
 CREATE TABLE analyses (
   id SERIAL PRIMARY KEY,
   resume_id TEXT REFERENCES resumes(file_name),
+  contacts JSONB,
   skills TEXT[],
   education TEXT[],
   experience JSONB,
+  formatting_issues TEXT[],
+  sections_missing TEXT[],
   suggestions TEXT[],
   ats_score INTEGER,
+  ats_breakdown JSONB,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -97,9 +104,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ## API Endpoints
 
 - `POST /api/upload-resume`: Upload resume file
-- `POST /api/analyze-resume`: Analyze resume content
-- `POST /api/ats-score`: Calculate ATS score
-- `POST /api/job-recommendations`: Get job recommendations
+- `POST /api/analyze-resume`: Analyze resume content (includes parsing, formatting checks, suggestions)
+- `POST /api/ats-score`: Calculate ATS score and breakdown; accepts optional `job_description` text and `simulator` (generic, workday, greenhouse, lever).
+- `POST /api/job-match`: Compare resume to a job description and return match percentage, missing keywords, and skill gap
+- `POST /api/job-recommendations`: Get generic job role recommendations based on extracted skills
 
 ## Notes
 

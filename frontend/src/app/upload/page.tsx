@@ -11,6 +11,8 @@ const Upload = () => {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
+  const [jobDescription, setJobDescription] = useState('')
+  const [simulator, setSimulator] = useState('generic')
   const router = useRouter()
 
   const onDrop = async (acceptedFiles: File[]) => {
@@ -70,19 +72,32 @@ const Upload = () => {
       const analyzeRes = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/analyze-resume`, { resume_id: resumeId }, { headers: authHeaders })
       setProgress(70)
 
-      const scoreRes = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/ats-score`, { resume_id: resumeId }, { headers: authHeaders })
+      const scoreRes = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/ats-score`, { resume_id: resumeId, job_description: jobDescription, simulator }, { headers: authHeaders })
       setProgress(90)
+
+      // optionally compute job match if description provided
+      let matchRes = null
+      if (jobDescription.trim()) {
+        matchRes = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/job-match`, { resume_id: resumeId, job_description: jobDescription }, { headers: authHeaders })
+      }
 
       const jobRes = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/job-recommendations`, { resume_id: resumeId }, { headers: authHeaders })
       setProgress(100)
 
-      const analysisData = {
+      const analysisData: any = {
+        contacts: analyzeRes.data.contacts,
         skills: analyzeRes.data.skills,
         education: analyzeRes.data.education,
         experience: analyzeRes.data.experience,
         suggestions: analyzeRes.data.suggestions,
+        formatting_issues: analyzeRes.data.formatting_issues,
+        sections_missing: analyzeRes.data.sections_missing,
         atsScore: scoreRes.data.score,
-        jobs: jobRes.data.jobs
+        atsBreakdown: scoreRes.data.breakdown,
+        jobs: jobRes.data.jobs,
+      }
+      if (matchRes) {
+        analysisData.jobMatch = matchRes.data
       }
       localStorage.setItem('analysis', JSON.stringify(analysisData))
       
@@ -138,9 +153,49 @@ const Upload = () => {
         }
         .animate-float { animation: float 3s ease-in-out infinite; }
         .animate-pulse-ring { animation: pulse-ring 2s infinite; }
+        /* Fix select dropdown text display */
+        select {
+          color: white;
+          background-color: rgba(15, 23, 42, 0.5);
+        }
+        select option {
+          color: white;
+          background-color: #1e293b;
+          padding: 8px;
+        }
+        select option:checked {
+          background: linear-gradient(#3b82f6, #3b82f6);
+          background-color: #3b82f6;
+          color: white;
+        }
       `}</style>
       
       <div className="w-full max-w-md animate-slide-up">
+        {/* optional job description input */}
+        <div className="mb-6">
+          <label className="text-white font-semibold">Job Description (optional)</label>
+          <textarea
+            className="w-full mt-1 p-2 rounded-lg bg-white/10 text-white border border-white/20"
+            rows={4}
+            value={jobDescription}
+            onChange={e => setJobDescription(e.target.value)}
+            placeholder="Paste a job description here to get a matching score"
+          />
+        </div>
+        {/* simulator selection */}
+        <div className="mb-6">
+          <label className="text-white font-semibold">ATS Simulator</label>
+          <select
+            className="w-full mt-1 p-2 rounded-lg bg-white/10 text-white border border-white/20"
+            value={simulator}
+            onChange={e => setSimulator(e.target.value)}
+          >
+            <option value="generic">Generic</option>
+            <option value="workday">Workday</option>
+            <option value="greenhouse">Greenhouse</option>
+            <option value="lever">Lever</option>
+          </select>
+        </div>
         <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-8 sm:p-10 border border-white/20 hover:border-white/30 transition-all duration-500">
           <div className="text-center mb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Upload Resume</h1>
@@ -230,7 +285,8 @@ const Upload = () => {
         </div>
 
         <p className="text-slate-400 text-xs sm:text-sm text-center mt-6">
-          Your resume will be analyzed using AI to provide personalized insights
+          Your resume will be analyzed using AI using common ATS screening principles
+          (keywords, formatting, structure) to give you actionable feedback.
         </p>
       </div>
     </div>
