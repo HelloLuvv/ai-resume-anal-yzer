@@ -163,16 +163,16 @@ def calculate_ats_breakdown(skills, education, experience, text, formatting_issu
     breakdown = {}
     # weighting differs slightly by simulator
     weights = {
-        'keyword': 40,
-        'skills': 25,
+        'keyword': 35,
+        'skills': 20,
         'format': 15,
         'experience': 10,
         'sections': 10,
         'education': 10
     }
     if simulator == 'workday':
-        weights['keyword'] = 35
-        weights['skills'] = 30
+        weights['keyword'] = 30
+        weights['skills'] = 25
     elif simulator == 'greenhouse':
         weights['format'] = 20
         weights['sections'] = 5
